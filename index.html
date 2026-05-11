@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Schedule</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0d0d;
+            --surface: #141414;
+            --surface2: #1c1c1c;
+            --border: #2a2a2a;
+            --accent: #e8ff5a;
+            --accent2: #ff5a5a;
+            --text: #f0f0f0;
+            --text-muted: #666;
+            --radius: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            min-height: 100vh;
+            padding: 32px 24px;
+        }
+
+        header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .logo span { color: var(--text-muted); font-weight: 700; }
+
+        .week-nav {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .week-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            min-width: 160px;
+            text-align: center;
+        }
+
+        .btn-nav {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .btn-nav:hover { border-color: var(--accent); background: #1f1f1f; }
+
+        .grid-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 580px;
+        }
+
+        thead th {
+            background: var(--surface);
+            padding: 14px 20px;
+            text-align: center;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            font-weight: 500;
+        }
+
+        thead th:first-child { text-align: left; min-width: 110px; }
+
+        .day-th { min-width: 130px; }
+
+        .day-th .day-name { color: var(--text); font-size: 0.72rem; }
+        .day-th .day-date { color: var(--text-muted); font-size: 0.65rem; margin-top: 2px; }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: #181818; }
+
+        td {
+            padding: 12px 20px;
+            vertical-align: middle;
+        }
+
+        td:first-child {
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+            color: var(--text);
+            white-space: nowrap;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+        }
+
+        td:not(:first-child) { text-align: center; }
+
+        .cell-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 36px;
+        }
+
+        .status-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 4px 6px;
+            border-radius: 6px;
+            transition: background 0.15s, transform 0.1s;
+            line-height: 1;
+        }
+
+        .status-btn:hover { background: var(--surface2); transform: scale(1.15); }
+        .status-btn.active { background: var(--surface2); outline: 2px solid var(--accent); }
+
+        .picker {
+            position: fixed;
+            z-index: 1000;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+            min-width: 200px;
+        }
+
+        .picker.visible { display: flex; }
+
+        .picker-title {
+            font-size: 0.6rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 4px 8px 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4px;
+        }
+
+        .picker-option {
+            background: none;
+            border: none;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.78rem;
+            text-align: left;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.1s;
+            white-space: nowrap;
+        }
+
+        .picker-option:hover { background: var(--surface2); }
+        .picker-option .opt-emoji { font-size: 1rem; }
+
+        .legend {
+            margin-top: 32px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+            padding: 16px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .legend-title {
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            width: 100%;
+            margin-bottom: 4px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .stat-pill {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-pill strong { color: var(--text); font-size: 0.8rem; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--accent);
+            color: #000;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 500;
+            padding: 10px 18px;
+            border-radius: 8px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            display: none;
+        }
+
+        .overlay.visible { display: block; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <div class="logo">NOSTROMO TEAM <span>SCHEDULE</span></div>
+    </div>
+    <div class="week-nav">
+        <button class="btn-nav" id="prevWeek">←</button>
+        <div class="week-label" id="weekLabel">—</div>
+        <button class="btn-nav" id="nextWeek">→</button>
+    </div>
+</header>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="grid-wrapper">
+    <table id="scheduleTable">
+        <thead>
+        <tr id="headerRow">
+            <th>Persona</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<div class="legend">
+    <div class="legend-title">Leyenda</div>
+    <div class="legend-item">🏠 Home office</div>
+    <div class="legend-item">🏢 Oficina</div>
+    <div class="legend-item">💀 Oficina obligatoria</div>
+    <div class="legend-item">✈️ Viaje</div>
+    <div class="legend-item">✳️ Festivo</div>
+    <div class="legend-item">😎 Vacaciones</div>
+    <div class="legend-item">🤒 Baja</div>
+    <div class="legend-item">🧑‍💻 Formación</div>
+</div>
+
+<div class="picker" id="picker">
+    <div class="picker-title" id="pickerTitle">Estado</div>
+</div>
+<div class="overlay" id="overlay"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+    const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi'];
+    const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+    const STATUS_OPTIONS = [
+        { key: 'home',     emoji: '🏠', label: 'Home office' },
+        { key: 'office',   emoji: '🏢', label: 'Oficina' },
+        { key: 'mandatory',emoji: '💀', label: 'Oficina obligatoria' },
+        { key: 'travel',   emoji: '✈️', label: 'Viaje' },
+        { key: 'holiday',  emoji: '✳️', label: 'Festivo' },
+        { key: 'vacation', emoji: '😎', label: 'Vacaciones' },
+        { key: 'illness',  emoji: '🤒', label: 'Baja' },
+        { key: 'training', emoji: '🧑‍💻', label: 'Formación' },
+        { key: null,       emoji: '✕',  label: 'Limpiar' },
+    ];
+
+    // Seed from screenshot
+    const INITIAL = {
+        'Majo':  { 0:'office', 1:'office', 2:'mandatory', 3:'home', 4:'home' },
+        'Duván': { 0:'office', 1:'office', 2:'mandatory', 3:'home', 4:'home' },
+        'Dani':  { 0:'office', 1:'home',   2:'mandatory', 3:'home', 4:'office' },
+        'Vega':  { 0:'home',   1:'office', 2:'mandatory', 3:'home', 4:'home' },
+        'Salva': { 0:'home',   1:'office', 2:'mandatory', 3:'home', 4:'home' },
+        'Manu':  { 0:'home',   1:'office', 2:'mandatory', 3:'home', 4:'office' },
+        'Javi':  { 0:'office', 1:'home',   2:'mandatory', 3:'home', 4:'office' },
+    };
+
+    // --- State ---
+    let currentMonday = getMonday(new Date());
+    let data = {}; // { weekKey: { person: { dayIndex: statusKey } } }
+
+    function weekKey(monday) {
+        return monday.toISOString().slice(0, 10);
+    }
+
+    function getMonday(date) {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = (day === 0) ? -6 : 1 - day;
+        d.setDate(d.getDate() + diff);
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }
+
+    function addDays(d, n) {
+        const r = new Date(d);
+        r.setDate(r.getDate() + n);
+        return r;
+    }
+
+    function formatDate(d) {
+        return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+    }
+
+    function formatWeekLabel(monday) {
+        const friday = addDays(monday, 4);
+        return `${formatDate(monday)} — ${formatDate(friday)}`;
+    }
+
+    function getWeekData(monday) {
+        const key = weekKey(monday);
+        if (!data[key]) {
+            data[key] = {};
+            TEAM.forEach(p => {
+                // Seed initial week with screenshot data
+                const isInitial = key === weekKey(getMonday(new Date()));
+                data[key][p] = isInitial && INITIAL[p] ? { ...INITIAL[p] } : {};
+            });
+        }
+        return data[key];
+    }
+
+    function getStatus(monday, person, dayIdx) {
+        return getWeekData(monday)[person]?.[dayIdx] ?? null;
+    }
+
+    function setStatus(monday, person, dayIdx, key) {
+        const wd = getWeekData(monday);
+        if (!wd[person]) wd[person] = {};
+        if (key === null) delete wd[person][dayIdx];
+        else wd[person][dayIdx] = key;
+        saveLocal();
+    }
+
+    function emojiFor(key) {
+        if (!key) return '';
+        return STATUS_OPTIONS.find(o => o.key === key)?.emoji ?? '';
+    }
+
+    // --- LocalStorage ---
+    function saveLocal() {
+        try { localStorage.setItem('teamschedule_v1', JSON.stringify(data)); } catch(e){}
+    }
+    function loadLocal() {
+        try {
+            const raw = localStorage.getItem('teamschedule_v1');
+            if (raw) data = JSON.parse(raw);
+        } catch(e) {}
+        // Always ensure initial week data exists
+        const key = weekKey(getMonday(new Date()));
+        if (!data[key]) {
+            data[key] = {};
+            TEAM.forEach(p => {
+                data[key][p] = INITIAL[p] ? { ...INITIAL[p] } : {};
+            });
+            saveLocal();
+        }
+    }
+
+    // --- Render ---
+    function render() {
+        const monday = currentMonday;
+        document.getElementById('weekLabel').textContent = formatWeekLabel(monday);
+
+        // Header
+        const headerRow = document.getElementById('headerRow');
+        headerRow.innerHTML = '<th>Persona</th>';
+        for (let i = 0; i < 5; i++) {
+            const d = addDays(monday, i);
+            const th = document.createElement('th');
+            th.className = 'day-th';
+            th.innerHTML = `<div class="day-name">${DAYS[i]}</div><div class="day-date">${formatDate(d)}</div>`;
+            headerRow.appendChild(th);
+        }
+
+        // Body
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        const wd = getWeekData(monday);
+
+        TEAM.forEach(person => {
+            const tr = document.createElement('tr');
+
+            const nameTd = document.createElement('td');
+            nameTd.textContent = person;
+            tr.appendChild(nameTd);
+
+            for (let i = 0; i < 5; i++) {
+                const td = document.createElement('td');
+                const key = wd[person]?.[i] ?? null;
+                const emoji = emojiFor(key);
+
+                const inner = document.createElement('div');
+                inner.className = 'cell-inner';
+
+                const btn = document.createElement('button');
+                btn.className = 'status-btn' + (key ? ' active' : '');
+                btn.textContent = emoji || '·';
+                btn.title = key ? STATUS_OPTIONS.find(o=>o.key===key)?.label : 'Sin estado';
+                btn.dataset.person = person;
+                btn.dataset.day = i;
+                btn.addEventListener('click', (e) => openPicker(e, person, i, btn));
+
+                inner.appendChild(btn);
+                td.appendChild(inner);
+                tr.appendChild(td);
+            }
+
+            tbody.appendChild(tr);
+        });
+
+        renderStats();
+    }
+
+    function renderStats() {
+        const wd = getWeekData(currentMonday);
+        let homeCount = 0, officeCount = 0, total = 0;
+        TEAM.forEach(p => {
+            for (let i = 0; i < 5; i++) {
+                const k = wd[p]?.[i];
+                if (k) total++;
+                if (k === 'home') homeCount++;
+                if (k === 'office' || k === 'mandatory') officeCount++;
+            }
+        });
+
+        const bar = document.getElementById('statsBar');
+        bar.innerHTML = `
+    <div class="stat-pill">🏠 Home office <strong>${homeCount}</strong></div>
+    <div class="stat-pill">🏢 Oficina <strong>${officeCount}</strong></div>
+    <div class="stat-pill">📊 Registrados <strong>${total}/${TEAM.length * 5}</strong></div>
+  `;
+    }
+
+    // --- Picker ---
+    let activePicker = { person: null, day: null, btn: null };
+
+    function openPicker(e, person, dayIdx, btn) {
+        e.stopPropagation();
+        const picker = document.getElementById('picker');
+        const overlay = document.getElementById('overlay');
+
+        activePicker = { person, day: dayIdx, btn };
+
+        document.getElementById('pickerTitle').textContent = `${person} — ${DAYS[dayIdx]}`;
+
+        // Build options
+        const existing = picker.querySelectorAll('.picker-option');
+        existing.forEach(el => el.remove());
+
+        STATUS_OPTIONS.forEach(opt => {
+            const btn2 = document.createElement('button');
+            btn2.className = 'picker-option';
+            btn2.innerHTML = `<span class="opt-emoji">${opt.emoji}</span> ${opt.label}`;
+            btn2.addEventListener('click', () => {
+                setStatus(currentMonday, person, dayIdx, opt.key);
+                closePicker();
+                render();
+                showToast(`${person}: ${opt.label}`);
+            });
+            picker.appendChild(btn2);
+        });
+
+        // Position
+        const rect = btn.getBoundingClientRect();
+        const pw = 220;
+        let left = rect.left + window.scrollX;
+        let top = rect.bottom + window.scrollY + 6;
+        if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+
+        picker.style.left = left + 'px';
+        picker.style.top = top + 'px';
+        picker.classList.add('visible');
+        overlay.classList.add('visible');
+    }
+
+    function closePicker() {
+        document.getElementById('picker').classList.remove('visible');
+        document.getElementById('overlay').classList.remove('visible');
+        activePicker = { person: null, day: null, btn: null };
+    }
+
+    document.getElementById('overlay').addEventListener('click', closePicker);
+
+    // --- Toast ---
+    let toastTimer;
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    // --- Nav ---
+    document.getElementById('prevWeek').addEventListener('click', () => {
+        currentMonday = addDays(currentMonday, -7);
+        render();
+    });
+    document.getElementById('nextWeek').addEventListener('click', () => {
+        currentMonday = addDays(currentMonday, 7);
+        render();
+    });
+
+    // --- Init ---
+    loadLocal();
+    render();
+</script>
+</body>
+</html>

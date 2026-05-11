@@ -38,8 +38,8 @@ function buildSeed() {
 export default async function handler(req, res) {
     if (req.method === 'GET') {
         try {
-            const { blob } = await get('teamschedule.json');
-            const text = await blob.text();
+            const { stream } = await get('teamschedule.json', { access: 'private' });
+            const text = await new Response(stream).text();
             return res.status(200).json(JSON.parse(text));
         } catch {
             const seeded = buildSeed();
@@ -47,6 +47,7 @@ export default async function handler(req, res) {
                 access: 'private',
                 addRandomSuffix: false,
                 contentType: 'application/json',
+                allowOverwrite: true,
             });
             return res.status(200).json(seeded);
         }
@@ -58,6 +59,7 @@ export default async function handler(req, res) {
             access: 'private',
             addRandomSuffix: false,
             contentType: 'application/json',
+            allowOverwrite: true,
         });
         return res.status(200).json({ ok: true });
     }

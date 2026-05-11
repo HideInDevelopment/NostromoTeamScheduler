@@ -16,9 +16,9 @@ const STATUS_OPTIONS = [
 // ---- State ----
 let currentMonday = getMonday(new Date());
 let data = {};
-let prevDataStr = '';
+let savedSnapshot = {};
+let dirty = false;
 let pollingTimer = null;
-let saveTimeout = null;
 
 // ---- Helpers ----
 function weekKey(monday) {
@@ -69,7 +69,8 @@ function setStatus(monday, person, dayIdx, statusKey) {
     if (!wd[person]) wd[person] = {};
     if (statusKey === null) delete wd[person][dayIdx];
     else wd[person][dayIdx] = statusKey;
-    saveToApi();
+    dirty = true;
+    updateSaveButton();
 }
 
 // ---- API ----
@@ -80,54 +81,57 @@ async function fetchData() {
         if (!res.ok) throw new Error('Network error');
         const newData = await res.json();
         data = newData;
-        prevDataStr = JSON.stringify(data);
+        savedSnapshot = JSON.parse(JSON.stringify(data));
         render();
     } catch (e) {
         data = {};
-        prevDataStr = '{}';
+        savedSnapshot = {};
         render();
         showToast('Error al cargar datos');
     } finally {
         hideSpinner();
+        updateSaveButton();
     }
 }
 
-function saveToApi() {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(async () => {
-        try {
-            const res = await fetch('/api/data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            if (res.ok) prevDataStr = JSON.stringify(data);
-        } catch (e) {
-            // Silently fail — next save will retry
+async function guardar() {
+    try {
+        const res = await fetch('/api/data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (res.ok) {
+            dirty = false;
+            savedSnapshot = JSON.parse(JSON.stringify(data));
+            updateSaveButton();
+            showToast('Guardado correctamente');
+        } else {
+            showToast('Error al guardar');
         }
-    }, 200);
+    } catch (e) {
+        showToast('Error al guardar');
+    }
 }
 
 // ---- Polling ----
 function startPolling() {
     stopPolling();
     pollingTimer = setInterval(async () => {
+        if (dirty) return;
         try {
             const res = await fetch('/api/data');
             if (!res.ok) return;
             const newData = await res.json();
-            const newStr = JSON.stringify(newData);
-            if (newStr !== prevDataStr) {
+            if (JSON.stringify(newData) !== JSON.stringify(savedSnapshot)) {
                 const key = weekKey(currentMonday);
-                const oldWeekData = data[key] ?? {};
-                const newWeekData = newData[key] ?? {};
-                patchTable(oldWeekData, newWeekData);
-                data = newData;
-                prevDataStr = newStr;
+                patchTable(savedSnapshot[key] ?? {}, newData[key] ?? {});
+                Object.keys(newData).forEach(k => {
+                    if (k !== key) data[k] = newData[k];
+                });
+                savedSnapshot = newData;
             }
-        } catch (e) {
-            // Silently fail polling
-        }
+        } catch (e) {}
     }, 30000);
 }
 
@@ -211,6 +215,7 @@ function renderStats() {
 
 function patchTable(oldWeekData, newWeekData) {
     let changed = false;
+    const key = weekKey(currentMonday);
 
     TEAM.forEach(person => {
         for (let i = 0; i < 5; i++) {
@@ -218,6 +223,11 @@ function patchTable(oldWeekData, newWeekData) {
             const newKey = newWeekData[person]?.[i] ?? null;
             if (oldKey !== newKey) {
                 changed = true;
+                if (!data[key]) data[key] = {};
+                if (!data[key][person]) data[key][person] = {};
+                if (newKey === null) delete data[key][person][i];
+                else data[key][person][i] = newKey;
+
                 const btn = document.querySelector(
                     `button.status-btn[data-person="${person}"][data-day="${i}"]`
                 );
@@ -283,6 +293,25 @@ function closePicker() {
     activePicker = { person: null, day: null, btn: null };
 }
 
+// ---- Save Button ----
+function updateSaveButton() {
+    document.getElementById('btnGuardar').classList.toggle('hidden', !dirty);
+}
+
+async function navigateTo(newMonday) {
+    if (dirty) {
+        if (confirm('Tienes cambios sin guardar. ¿Guardar antes de navegar?')) {
+            await guardar();
+        } else {
+            data = JSON.parse(JSON.stringify(savedSnapshot));
+            dirty = false;
+            updateSaveButton();
+        }
+    }
+    currentMonday = newMonday;
+    render();
+}
+
 // ---- Toast ----
 let toastTimer;
 function showToast(msg) {
@@ -303,15 +332,12 @@ function hideSpinner() {
 
 // ---- Event Listeners ----
 document.getElementById('overlay').addEventListener('click', closePicker);
-
+document.getElementById('btnGuardar').addEventListener('click', guardar);
 document.getElementById('prevWeek').addEventListener('click', () => {
-    currentMonday = addDays(currentMonday, -7);
-    render();
+    navigateTo(addDays(currentMonday, -7));
 });
-
 document.getElementById('nextWeek').addEventListener('click', () => {
-    currentMonday = addDays(currentMonday, 7);
-    render();
+    navigateTo(addDays(currentMonday, 7));
 });
 
 // ---- Init ----

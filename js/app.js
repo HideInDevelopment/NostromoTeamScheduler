@@ -1,5 +1,5 @@
 // ---- Constants ----
-const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi'];
+const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi', 'Tessa'];
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const STATUS_OPTIONS = [
     { key: 'home',     emoji: '🏠', label: 'Home office' },

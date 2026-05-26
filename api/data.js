@@ -1,6 +1,6 @@
 import { put, get } from '@vercel/blob';
 
-const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi'];
+const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi', 'Tessa'];
 
 const INITIAL = {
     'Majo':  { 0:'office', 1:'office', 2:'mandatory', 3:'home', 4:'home' },
@@ -10,6 +10,7 @@ const INITIAL = {
     'Salva': { 0:'home',   1:'office', 2:'mandatory', 3:'home', 4:'home' },
     'Manu':  { 0:'home',   1:'office', 2:'mandatory', 3:'home', 4:'office' },
     'Javi':  { 0:'office', 1:'home',   2:'mandatory', 3:'home', 4:'office' },
+    'Tessa': {},
 };
 
 function getMonday(date) {

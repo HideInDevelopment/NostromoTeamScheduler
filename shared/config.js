@@ -12,20 +12,9 @@ export const STATUS_OPTIONS = [
 ];
 export const VALID_STATUSES = new Set(STATUS_OPTIONS.map(option => option.key));
 
-// ponytail: one shared seed template; replace with all-empty week when the bootstrap snapshot stops being useful
-export const INITIAL_WEEK_TEMPLATE = {
-    Majo: { 0: 'office', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    'Duván': { 0: 'office', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    Dani: { 0: 'office', 1: 'home', 2: 'mandatory', 3: 'home', 4: 'office' },
-    Vega: { 0: 'home', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    Salva: { 0: 'home', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    Manu: { 0: 'home', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'office' },
-    Javi: { 0: 'office', 1: 'home', 2: 'mandatory', 3: 'home', 4: 'office' },
-};
-
-export function createSeedWeekData(template = INITIAL_WEEK_TEMPLATE) {
+export function createSeedWeekData() {
     return TEAM.reduce((acc, person) => {
-        acc[person] = template[person] ? { ...template[person] } : {};
+        acc[person] = {};
         return acc;
     }, {});
 }

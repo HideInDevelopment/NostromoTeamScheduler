@@ -48,6 +48,7 @@ assert.deepEqual(
 
 const seededWeek = createSeedWeekData();
 assert.equal(Object.keys(seededWeek).length, TEAM.length);
+assert.deepEqual(seededWeek.Majo, {});
 assert.deepEqual(seededWeek.Tessa, {});
 assert.equal(STATUS_OPTIONS.some(option => option.key === 'mandatory'), true);
 

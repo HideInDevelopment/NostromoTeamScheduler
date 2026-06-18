@@ -331,5 +331,6 @@ td:not(:first-child) { text-align: center; }
 }
 
 .btn-save:hover { opacity: 0.85; }
+.btn-save:disabled { opacity: 0.7; cursor: wait; }
 
 .hidden { display: none; }

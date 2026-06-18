@@ -4,6 +4,8 @@ import { DAYS, STATUS_OPTIONS, TEAM } from '../shared/config.js';
 const CLEAR_OPTION = { key: null, emoji: '✕', label: 'Limpiar' };
 const PICKER_OPTIONS = [...STATUS_OPTIONS, CLEAR_OPTION];
 const AUTOSAVE_DELAY_MS = 1200;
+const SAVE_BUTTON_LABEL = '💾 Guardar';
+const SAVING_BUTTON_LABEL = '⏳ Guardando...';
 
 // ---- State ----
 let currentMonday = getMonday(new Date());
@@ -14,6 +16,9 @@ let savedVersions = {};
 let dirty = false;
 let pollingTimer = null;
 let autosaveTimer = null;
+let saveInFlight = false;
+let queuedSave = false;
+let localChangeToken = 0;
 
 // ---- Helpers ----
 function clone(value) {
@@ -68,6 +73,7 @@ function setStatus(monday, person, dayIdx, statusKey) {
     if (!wd[person]) wd[person] = {};
     if (statusKey === null) delete wd[person][dayIdx];
     else wd[person][dayIdx] = statusKey;
+    localChangeToken += 1;
     dirty = true;
     updateSaveButton();
     scheduleAutosave();
@@ -114,9 +120,21 @@ async function fetchData() {
 }
 
 async function guardar({ automatic = false } = {}) {
+    if (saveInFlight) {
+        queuedSave = true;
+        updateSaveButton();
+        return false;
+    }
+
     const key = weekKey(currentMonday);
     const currentWeekData = clone(getWeekData(currentMonday));
+    const saveToken = localChangeToken;
+    const currentEtag = versions[key]?.etag ?? null;
+
     clearAutosaveTimer();
+    saveInFlight = true;
+    queuedSave = false;
+    updateSaveButton();
 
     try {
         const res = await fetch('/api/data', {
@@ -125,7 +143,7 @@ async function guardar({ automatic = false } = {}) {
             body: JSON.stringify({
                 weekKey: key,
                 weekData: currentWeekData,
-                etag: versions[key]?.etag ?? null,
+                etag: currentEtag,
             }),
         });
 
@@ -145,18 +163,31 @@ async function guardar({ automatic = false } = {}) {
         }
 
         const payload = await res.json();
-        data[payload.weekKey] = payload.weekData;
         versions[payload.weekKey] = payload.version;
-        savedSnapshot = clone(data);
-        savedVersions = clone(versions);
-        dirty = false;
+        savedSnapshot[payload.weekKey] = payload.weekData;
+        savedVersions[payload.weekKey] = payload.version;
+
+        if (localChangeToken === saveToken) {
+            dirty = false;
+        } else {
+            queuedSave = true;
+            dirty = true;
+        }
+
         updateSaveButton();
-        showToast(automatic ? 'Guardado automático' : 'Guardado correctamente');
         return true;
     } catch (e) {
         console.error('Error guardando semana', key, e);
         showToast(e.message || 'Error al guardar');
         return false;
+    } finally {
+        saveInFlight = false;
+        updateSaveButton();
+
+        if (queuedSave && dirty) {
+            queuedSave = false;
+            guardar({ automatic: true });
+        }
     }
 }
 
@@ -360,7 +391,10 @@ function closePicker() {
 
 // ---- Save Button ----
 function updateSaveButton() {
-    document.getElementById('btnGuardar').classList.toggle('hidden', !dirty);
+    const button = document.getElementById('btnGuardar');
+    button.classList.toggle('hidden', !dirty && !saveInFlight);
+    button.disabled = saveInFlight;
+    button.textContent = saveInFlight ? SAVING_BUTTON_LABEL : SAVE_BUTTON_LABEL;
 }
 
 async function navigateTo(newMonday) {

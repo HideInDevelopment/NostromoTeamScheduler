@@ -2,25 +2,31 @@
 const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi', 'Tessa'];
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const STATUS_OPTIONS = [
-    { key: 'home',     emoji: '🏠', label: 'Home office' },
-    { key: 'office',   emoji: '🏢', label: 'Oficina' },
-    { key: 'mandatory',emoji: '💀', label: 'Oficina obligatoria' },
-    { key: 'travel',   emoji: '✈️', label: 'Viaje' },
-    { key: 'holiday',  emoji: '✳️', label: 'Festivo' },
+    { key: 'home', emoji: '🏠', label: 'Home office' },
+    { key: 'office', emoji: '🏢', label: 'Oficina' },
+    { key: 'mandatory', emoji: '💀', label: 'Oficina obligatoria' },
+    { key: 'travel', emoji: '✈️', label: 'Viaje' },
+    { key: 'holiday', emoji: '✳️', label: 'Festivo' },
     { key: 'vacation', emoji: '😎', label: 'Vacaciones' },
-    { key: 'illness',  emoji: '🤒', label: 'Baja' },
+    { key: 'illness', emoji: '🤒', label: 'Baja' },
     { key: 'training', emoji: '🧑‍💻', label: 'Formación' },
-    { key: null,       emoji: '✕',  label: 'Limpiar' },
+    { key: null, emoji: '✕', label: 'Limpiar' },
 ];
 
 // ---- State ----
 let currentMonday = getMonday(new Date());
 let data = {};
+let versions = {};
 let savedSnapshot = {};
+let savedVersions = {};
 let dirty = false;
 let pollingTimer = null;
 
 // ---- Helpers ----
+function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
 function weekKey(monday) {
     return monday.toISOString().slice(0, 10);
 }
@@ -28,7 +34,7 @@ function weekKey(monday) {
 function getMonday(date) {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = (day === 0) ? -6 : 1 - day;
+    const diff = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diff);
     d.setHours(0, 0, 0, 0);
     return d;
@@ -51,7 +57,7 @@ function formatWeekLabel(monday) {
 
 function emojiFor(key) {
     if (!key) return '';
-    return STATUS_OPTIONS.find(o => o.key === key)?.emoji ?? '';
+    return STATUS_OPTIONS.find(option => option.key === key)?.emoji ?? '';
 }
 
 function getWeekData(monday) {
@@ -73,19 +79,27 @@ function setStatus(monday, person, dayIdx, statusKey) {
     updateSaveButton();
 }
 
+function applyServerState(payload) {
+    data = payload.data ?? {};
+    versions = payload.versions ?? {};
+    savedSnapshot = clone(data);
+    savedVersions = clone(versions);
+}
+
 // ---- API ----
 async function fetchData() {
     showSpinner();
     try {
         const res = await fetch('/api/data');
         if (!res.ok) throw new Error('Network error');
-        const newData = await res.json();
-        data = newData;
-        savedSnapshot = JSON.parse(JSON.stringify(data));
+        const payload = await res.json();
+        applyServerState(payload);
         render();
     } catch (e) {
         data = {};
+        versions = {};
         savedSnapshot = {};
+        savedVersions = {};
         render();
         showToast('Error al cargar datos');
     } finally {
@@ -95,22 +109,46 @@ async function fetchData() {
 }
 
 async function guardar() {
+    const key = weekKey(currentMonday);
+    const currentWeekData = clone(getWeekData(currentMonday));
+
     try {
         const res = await fetch('/api/data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+            body: JSON.stringify({
+                weekKey: key,
+                weekData: currentWeekData,
+                etag: versions[key]?.etag ?? null,
+            }),
         });
-        if (res.ok) {
-            dirty = false;
-            savedSnapshot = JSON.parse(JSON.stringify(data));
-            updateSaveButton();
-            showToast('Guardado correctamente');
-        } else {
-            showToast('Error al guardar');
+
+        if (res.status === 409) {
+            const conflict = await res.json();
+            if (conflict.currentVersion) {
+                versions[key] = conflict.currentVersion;
+            }
+            showToast('Hay cambios remotos. Recarga antes de guardar');
+            return false;
         }
+
+        if (!res.ok) {
+            showToast('Error al guardar');
+            return false;
+        }
+
+        const payload = await res.json();
+        data[payload.weekKey] = payload.weekData;
+        versions[payload.weekKey] = payload.version;
+        savedSnapshot = clone(data);
+        savedVersions = clone(versions);
+        dirty = false;
+        updateSaveButton();
+        showToast('Guardado correctamente');
+        return true;
     } catch (e) {
         showToast('Error al guardar');
+        return false;
     }
 }
 
@@ -122,15 +160,19 @@ function startPolling() {
         try {
             const res = await fetch('/api/data');
             if (!res.ok) return;
-            const newData = await res.json();
-            if (JSON.stringify(newData) !== JSON.stringify(savedSnapshot)) {
-                const key = weekKey(currentMonday);
+            const payload = await res.json();
+            const newData = payload.data ?? {};
+            const newVersions = payload.versions ?? {};
+            const key = weekKey(currentMonday);
+
+            if (newVersions[key]?.etag !== savedVersions[key]?.etag) {
                 patchTable(savedSnapshot[key] ?? {}, newData[key] ?? {});
-                Object.keys(newData).forEach(k => {
-                    if (k !== key) data[k] = newData[k];
-                });
-                savedSnapshot = newData;
             }
+
+            data = newData;
+            versions = newVersions;
+            savedSnapshot = clone(newData);
+            savedVersions = clone(newVersions);
         } catch (e) {}
     }, 30000);
 }
@@ -168,7 +210,7 @@ function render() {
 
         for (let i = 0; i < 5; i++) {
             const td = document.createElement('td');
-            const key = wd[person]?.[i] ?? null;
+            const key = getStatus(monday, person, i);
             const emoji = emojiFor(key);
 
             const inner = document.createElement('div');
@@ -177,10 +219,10 @@ function render() {
             const btn = document.createElement('button');
             btn.className = 'status-btn' + (key ? ' active' : '');
             btn.textContent = emoji || '·';
-            btn.title = key ? STATUS_OPTIONS.find(o => o.key === key)?.label : 'Sin estado';
+            btn.title = key ? STATUS_OPTIONS.find(option => option.key === key)?.label : 'Sin estado';
             btn.dataset.person = person;
             btn.dataset.day = i;
-            btn.addEventListener('click', (e) => openPicker(e, person, i, btn));
+            btn.addEventListener('click', event => openPicker(event, person, i, btn));
 
             inner.appendChild(btn);
             td.appendChild(inner);
@@ -195,13 +237,16 @@ function render() {
 
 function renderStats() {
     const wd = getWeekData(currentMonday);
-    let homeCount = 0, officeCount = 0, total = 0;
-    TEAM.forEach(p => {
+    let homeCount = 0;
+    let officeCount = 0;
+    let total = 0;
+
+    TEAM.forEach(person => {
         for (let i = 0; i < 5; i++) {
-            const k = wd[p]?.[i];
-            if (k) total++;
-            if (k === 'home') homeCount++;
-            if (k === 'office' || k === 'mandatory') officeCount++;
+            const status = wd[person]?.[i];
+            if (status) total++;
+            if (status === 'home') homeCount++;
+            if (status === 'office' || status === 'mandatory') officeCount++;
         }
     });
 
@@ -235,16 +280,14 @@ function patchTable(oldWeekData, newWeekData) {
                     btn.textContent = newKey ? emojiFor(newKey) : '·';
                     btn.className = 'status-btn' + (newKey ? ' active' : '');
                     btn.title = newKey
-                        ? STATUS_OPTIONS.find(o => o.key === newKey)?.label
+                        ? STATUS_OPTIONS.find(option => option.key === newKey)?.label
                         : 'Sin estado';
                 }
             }
         }
     });
 
-    if (changed) {
-        renderStats();
-    }
+    if (changed) renderStats();
 }
 
 // ---- Picker ----
@@ -256,33 +299,32 @@ function openPicker(e, person, dayIdx, btn) {
     const overlay = document.getElementById('overlay');
 
     activePicker = { person, day: dayIdx, btn };
-
     document.getElementById('pickerTitle').textContent = `${person} — ${DAYS[dayIdx]}`;
 
     const existing = picker.querySelectorAll('.picker-option');
     existing.forEach(el => el.remove());
 
-    STATUS_OPTIONS.forEach(opt => {
-        const btn2 = document.createElement('button');
-        btn2.className = 'picker-option';
-        btn2.innerHTML = `<span class="opt-emoji">${opt.emoji}</span> ${opt.label}`;
-        btn2.addEventListener('click', () => {
-            setStatus(currentMonday, person, dayIdx, opt.key);
+    STATUS_OPTIONS.forEach(option => {
+        const optionButton = document.createElement('button');
+        optionButton.className = 'picker-option';
+        optionButton.innerHTML = `<span class="opt-emoji">${option.emoji}</span> ${option.label}`;
+        optionButton.addEventListener('click', () => {
+            setStatus(currentMonday, person, dayIdx, option.key);
             closePicker();
             render();
-            showToast(`${person}: ${opt.label}`);
+            showToast(`${person}: ${option.label}`);
         });
-        picker.appendChild(btn2);
+        picker.appendChild(optionButton);
     });
 
     const rect = btn.getBoundingClientRect();
-    const pw = 220;
+    const pickerWidth = 220;
     let left = rect.left + window.scrollX;
     let top = rect.bottom + window.scrollY + 6;
-    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+    if (left + pickerWidth > window.innerWidth - 10) left = window.innerWidth - pickerWidth - 10;
 
-    picker.style.left = left + 'px';
-    picker.style.top = top + 'px';
+    picker.style.left = `${left}px`;
+    picker.style.top = `${top}px`;
     picker.classList.add('visible');
     overlay.classList.add('visible');
 }
@@ -301,9 +343,11 @@ function updateSaveButton() {
 async function navigateTo(newMonday) {
     if (dirty) {
         if (confirm('Tienes cambios sin guardar. ¿Guardar antes de navegar?')) {
-            await guardar();
+            const saved = await guardar();
+            if (!saved) return;
         } else {
-            data = JSON.parse(JSON.stringify(savedSnapshot));
+            data = clone(savedSnapshot);
+            versions = clone(savedVersions);
             dirty = false;
             updateSaveButton();
         }
@@ -315,17 +359,18 @@ async function navigateTo(newMonday) {
 // ---- Toast ----
 let toastTimer;
 function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
 // ---- Spinner ----
 function showSpinner() {
     document.getElementById('spinner').classList.remove('spinner-hidden');
 }
+
 function hideSpinner() {
     document.getElementById('spinner').classList.add('spinner-hidden');
 }

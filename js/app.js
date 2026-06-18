@@ -1,17 +1,9 @@
+import { DAYS, STATUS_OPTIONS, TEAM } from '../shared/config.js';
+
 // ---- Constants ----
-const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi', 'Tessa'];
-const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-const STATUS_OPTIONS = [
-    { key: 'home', emoji: '🏠', label: 'Home office' },
-    { key: 'office', emoji: '🏢', label: 'Oficina' },
-    { key: 'mandatory', emoji: '💀', label: 'Oficina obligatoria' },
-    { key: 'travel', emoji: '✈️', label: 'Viaje' },
-    { key: 'holiday', emoji: '✳️', label: 'Festivo' },
-    { key: 'vacation', emoji: '😎', label: 'Vacaciones' },
-    { key: 'illness', emoji: '🤒', label: 'Baja' },
-    { key: 'training', emoji: '🧑‍💻', label: 'Formación' },
-    { key: null, emoji: '✕', label: 'Limpiar' },
-];
+const CLEAR_OPTION = { key: null, emoji: '✕', label: 'Limpiar' };
+const PICKER_OPTIONS = [...STATUS_OPTIONS, CLEAR_OPTION];
+const AUTOSAVE_DELAY_MS = 1200;
 
 // ---- State ----
 let currentMonday = getMonday(new Date());
@@ -21,6 +13,7 @@ let savedSnapshot = {};
 let savedVersions = {};
 let dirty = false;
 let pollingTimer = null;
+let autosaveTimer = null;
 
 // ---- Helpers ----
 function clone(value) {
@@ -77,6 +70,7 @@ function setStatus(monday, person, dayIdx, statusKey) {
     else wd[person][dayIdx] = statusKey;
     dirty = true;
     updateSaveButton();
+    scheduleAutosave();
 }
 
 function applyServerState(payload) {
@@ -108,9 +102,10 @@ async function fetchData() {
     }
 }
 
-async function guardar() {
+async function guardar({ automatic = false } = {}) {
     const key = weekKey(currentMonday);
     const currentWeekData = clone(getWeekData(currentMonday));
+    clearAutosaveTimer();
 
     try {
         const res = await fetch('/api/data', {
@@ -144,12 +139,25 @@ async function guardar() {
         savedVersions = clone(versions);
         dirty = false;
         updateSaveButton();
-        showToast('Guardado correctamente');
+        showToast(automatic ? 'Guardado automático' : 'Guardado correctamente');
         return true;
     } catch (e) {
         showToast('Error al guardar');
         return false;
     }
+}
+
+function clearAutosaveTimer() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+}
+
+function scheduleAutosave() {
+    clearAutosaveTimer();
+    autosaveTimer = setTimeout(() => {
+        if (!dirty) return;
+        guardar({ automatic: true });
+    }, AUTOSAVE_DELAY_MS);
 }
 
 // ---- Polling ----
@@ -304,7 +312,7 @@ function openPicker(e, person, dayIdx, btn) {
     const existing = picker.querySelectorAll('.picker-option');
     existing.forEach(el => el.remove());
 
-    STATUS_OPTIONS.forEach(option => {
+    PICKER_OPTIONS.forEach(option => {
         const optionButton = document.createElement('button');
         optionButton.className = 'picker-option';
         optionButton.innerHTML = `<span class="opt-emoji">${option.emoji}</span> ${option.label}`;
@@ -346,6 +354,7 @@ async function navigateTo(newMonday) {
             const saved = await guardar();
             if (!saved) return;
         } else {
+            clearAutosaveTimer();
             data = clone(savedSnapshot);
             versions = clone(savedVersions);
             dirty = false;

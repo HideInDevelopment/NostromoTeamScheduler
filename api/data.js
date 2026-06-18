@@ -1,29 +1,8 @@
 import { BlobNotFoundError, get, head, list, put } from '@vercel/blob';
+import { TEAM, VALID_STATUSES, createSeedWeekData } from '../shared/config.js';
 
-const TEAM = ['Majo', 'Duván', 'Dani', 'Vega', 'Salva', 'Manu', 'Javi', 'Tessa'];
-const VALID_STATUSES = new Set([
-    'home',
-    'office',
-    'mandatory',
-    'travel',
-    'holiday',
-    'vacation',
-    'illness',
-    'training',
-]);
 const WEEKS_PREFIX = 'weeks/';
 const LEGACY_PATH = 'teamschedule.json';
-
-const INITIAL = {
-    Majo: { 0: 'office', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    'Duván': { 0: 'office', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    Dani: { 0: 'office', 1: 'home', 2: 'mandatory', 3: 'home', 4: 'office' },
-    Vega: { 0: 'home', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    Salva: { 0: 'home', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'home' },
-    Manu: { 0: 'home', 1: 'office', 2: 'mandatory', 3: 'home', 4: 'office' },
-    Javi: { 0: 'office', 1: 'home', 2: 'mandatory', 3: 'home', 4: 'office' },
-    Tessa: {},
-};
 
 function getMonday(date) {
     const d = new Date(date);
@@ -49,10 +28,7 @@ function weekPath(week) {
 function buildSeed() {
     const key = weekKey(getMonday(new Date()));
     return {
-        [key]: TEAM.reduce((acc, person) => {
-            acc[person] = INITIAL[person] ? { ...INITIAL[person] } : {};
-            return acc;
-        }, {}),
+        [key]: createSeedWeekData(),
     };
 }
 

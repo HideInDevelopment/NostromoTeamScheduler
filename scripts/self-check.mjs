@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { validateSavePayload, validateStoreShape, validateWeekData } from '../api/data.js';
+import { STATUS_OPTIONS, TEAM, createSeedWeekData } from '../shared/config.js';
 
 const validWeek = {
     Majo: { 0: 'office', 1: 'home' },
@@ -44,5 +45,10 @@ assert.deepEqual(
         '2026-06-15': validWeek,
     }
 );
+
+const seededWeek = createSeedWeekData();
+assert.equal(Object.keys(seededWeek).length, TEAM.length);
+assert.deepEqual(seededWeek.Tessa, {});
+assert.equal(STATUS_OPTIONS.some(option => option.key === 'mandatory'), true);
 
 console.log('self-check ok');

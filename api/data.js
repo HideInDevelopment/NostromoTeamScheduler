@@ -1,7 +1,8 @@
-import { BlobNotFoundError, get, head, list, put } from '@vercel/blob';
+import { BlobNotFoundError, copy, get, head, list, put } from '@vercel/blob';
 import { TEAM, VALID_STATUSES, createSeedWeekData } from '../shared/config.js';
 
 const WEEKS_PREFIX = 'weeks/';
+const HISTORY_PREFIX = 'history/';
 const LEGACY_PATH = 'teamschedule.json';
 
 function getMonday(date) {
@@ -23,6 +24,11 @@ function isWeekKey(value) {
 
 function weekPath(week) {
     return `${WEEKS_PREFIX}${week}.json`;
+}
+
+function backupPath(week, uploadedAt = new Date()) {
+    const stamp = uploadedAt.toISOString().replace(/[:.]/g, '-');
+    return `${HISTORY_PREFIX}${week}/${stamp}.json`;
 }
 
 function buildSeed() {
@@ -125,6 +131,14 @@ export function validateSavePayload(payload) {
 }
 
 async function writeWeek(week, weekData) {
+    const currentVersion = await getCurrentVersion(week);
+    if (currentVersion) {
+        // ponytail: one backup per write is enough here; add pruning only if blob history grows into a real cost
+        await copy(weekPath(week), backupPath(week, new Date(currentVersion.updatedAt)), {
+            access: 'private',
+        });
+    }
+
     await put(weekPath(week), JSON.stringify(weekData), {
         access: 'private',
         addRandomSuffix: false,
@@ -138,6 +152,10 @@ async function writeWeek(week, weekData) {
         weekData,
         version: toVersion(blob),
     };
+}
+
+function jsonError(res, status, error, details) {
+    return res.status(status).json(details ? { error, details } : { error });
 }
 
 async function readWeekStore() {
@@ -209,7 +227,7 @@ export default async function handler(req, res) {
             return res.status(200).json(store);
         } catch (error) {
             console.error('GET /api/data failed', error);
-            return res.status(500).json({ error: 'No se pudo cargar el calendario' });
+            return jsonError(res, 500, 'No se pudo cargar el calendario');
         }
     }
 
@@ -231,17 +249,17 @@ export default async function handler(req, res) {
             return res.status(200).json({ ok: true, ...saved });
         } catch (error) {
             if (error instanceof SyntaxError) {
-                return res.status(400).json({ error: 'JSON no válido' });
+                return jsonError(res, 400, 'JSON no válido');
             }
 
             if (error.message?.includes('no válido')) {
-                return res.status(400).json({ error: error.message });
+                return jsonError(res, 400, error.message);
             }
 
             console.error('POST /api/data failed', error);
-            return res.status(500).json({ error: 'No se pudo guardar la semana' });
+            return jsonError(res, 500, 'No se pudo guardar la semana');
         }
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonError(res, 405, 'Method not allowed');
 }

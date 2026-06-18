@@ -80,22 +80,33 @@ function applyServerState(payload) {
     savedVersions = clone(versions);
 }
 
+async function readErrorMessage(res, fallback) {
+    try {
+        const payload = await res.json();
+        return payload.error || fallback;
+    } catch (error) {
+        console.error('No se pudo leer la respuesta de error', error);
+        return fallback;
+    }
+}
+
 // ---- API ----
 async function fetchData() {
     showSpinner();
     try {
         const res = await fetch('/api/data');
-        if (!res.ok) throw new Error('Network error');
+        if (!res.ok) throw new Error(await readErrorMessage(res, 'Error al cargar datos'));
         const payload = await res.json();
         applyServerState(payload);
         render();
     } catch (e) {
+        console.error('Error cargando datos', e);
         data = {};
         versions = {};
         savedSnapshot = {};
         savedVersions = {};
         render();
-        showToast('Error al cargar datos');
+        showToast(e.message || 'Error al cargar datos');
     } finally {
         hideSpinner();
         updateSaveButton();
@@ -123,12 +134,13 @@ async function guardar({ automatic = false } = {}) {
             if (conflict.currentVersion) {
                 versions[key] = conflict.currentVersion;
             }
+            console.warn('Conflicto al guardar semana', key, conflict);
             showToast('Hay cambios remotos. Recarga antes de guardar');
             return false;
         }
 
         if (!res.ok) {
-            showToast('Error al guardar');
+            showToast(await readErrorMessage(res, 'Error al guardar'));
             return false;
         }
 
@@ -142,7 +154,8 @@ async function guardar({ automatic = false } = {}) {
         showToast(automatic ? 'Guardado automático' : 'Guardado correctamente');
         return true;
     } catch (e) {
-        showToast('Error al guardar');
+        console.error('Error guardando semana', key, e);
+        showToast(e.message || 'Error al guardar');
         return false;
     }
 }
@@ -181,7 +194,9 @@ function startPolling() {
             versions = newVersions;
             savedSnapshot = clone(newData);
             savedVersions = clone(newVersions);
-        } catch (e) {}
+        } catch (e) {
+            console.error('Error refrescando calendario', e);
+        }
     }, 30000);
 }
 

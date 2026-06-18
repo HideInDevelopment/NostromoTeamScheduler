@@ -1,5 +1,12 @@
 import { BlobNotFoundError, copy, get, head, list, put } from '@vercel/blob';
-import { TEAM, VALID_STATUSES, createSeedWeekData } from '../shared/config.js';
+import {
+    EXTRA_DEFAULT_NAME,
+    TEAM,
+    VALID_STATUSES,
+    createEmptyExtraWeekData,
+    createEmptyTeamWeekData,
+    createSeedWeekData,
+} from '../shared/config.js';
 
 const WEEKS_PREFIX = 'weeks/';
 const HISTORY_PREFIX = 'history/';
@@ -70,9 +77,13 @@ export function validateWeekData(weekData) {
         throw new Error('Formato de semana no válido');
     }
 
-    const normalized = {};
+    const isStructuredWeek = 'team' in weekData || 'extra' in weekData;
+    const teamData = isStructuredWeek ? weekData.team ?? {} : weekData;
+    const extraData = isStructuredWeek ? weekData.extra ?? {} : {};
 
-    for (const [person, days] of Object.entries(weekData)) {
+    const normalizedTeam = createEmptyTeamWeekData();
+
+    for (const [person, days] of Object.entries(teamData)) {
         if (!TEAM.includes(person)) {
             throw new Error(`Persona no válida: ${person}`);
         }
@@ -91,10 +102,46 @@ export function validateWeekData(weekData) {
             normalizedDays[dayKey] = statusKey;
         }
 
-        normalized[person] = normalizedDays;
+        normalizedTeam[person] = normalizedDays;
     }
 
-    return normalized;
+    const normalizedExtra = createEmptyExtraWeekData();
+    if (extraData !== undefined && (typeof extraData !== 'object' || Array.isArray(extraData) || extraData === null)) {
+        throw new Error('Formato de integrante extra no válido');
+    }
+
+    if (typeof extraData.enabled === 'boolean') {
+        normalizedExtra.enabled = extraData.enabled;
+    } else if (extraData.enabled !== undefined) {
+        throw new Error('Estado de integrante extra no válido');
+    }
+
+    if (extraData.name !== undefined) {
+        if (typeof extraData.name !== 'string') {
+            throw new Error('Nombre de integrante extra no válido');
+        }
+        normalizedExtra.name = extraData.name.trim() || EXTRA_DEFAULT_NAME;
+    }
+
+    const extraDays = extraData.days ?? {};
+    if (typeof extraDays !== 'object' || Array.isArray(extraDays) || extraDays === null) {
+        throw new Error('Días de integrante extra no válidos');
+    }
+
+    for (const [dayKey, statusKey] of Object.entries(extraDays)) {
+        if (!/^[0-4]$/.test(dayKey)) {
+            throw new Error(`Día no válido para integrante extra: ${dayKey}`);
+        }
+        if (!VALID_STATUSES.has(statusKey)) {
+            throw new Error(`Estado no válido para integrante extra: ${statusKey}`);
+        }
+        normalizedExtra.days[dayKey] = statusKey;
+    }
+
+    return {
+        team: normalizedTeam,
+        extra: normalizedExtra,
+    };
 }
 
 export function validateStoreShape(store) {

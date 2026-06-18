@@ -72,6 +72,26 @@ header {
 
 .btn-nav:hover { border-color: var(--accent); background: #1f1f1f; }
 
+.btn-extra {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.btn-extra:hover,
+.btn-extra.active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: var(--surface2);
+}
+
 .grid-wrapper {
     overflow-x: auto;
     border-radius: 12px;
@@ -111,6 +131,10 @@ tbody tr {
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #181818; }
 
+.extra-row td:first-child {
+    background: #171717;
+}
+
 td {
     padding: 12px 20px;
     vertical-align: middle;
@@ -124,6 +148,33 @@ td:first-child {
     white-space: nowrap;
     background: var(--surface);
     border-right: 1px solid var(--border);
+}
+
+.extra-name-cell {
+    padding: 8px 14px;
+}
+
+.extra-name-input {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 1px;
+    border-radius: 6px;
+    padding: 8px 10px;
+    outline: none;
+}
+
+.extra-name-input::placeholder {
+    color: var(--text-muted);
+}
+
+.extra-name-input:hover,
+.extra-name-input:focus {
+    border-color: var(--border);
+    background: var(--surface2);
 }
 
 td:not(:first-child) { text-align: center; }

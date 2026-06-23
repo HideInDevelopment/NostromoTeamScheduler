@@ -23,6 +23,7 @@ export function createEmptyTeamWeekData() {
 export function createEmptyExtraWeekData() {
     return {
         enabled: false,
+        dismissed: false,
         name: EXTRA_DEFAULT_NAME,
         days: {},
     };

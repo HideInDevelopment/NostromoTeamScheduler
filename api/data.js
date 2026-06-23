@@ -116,6 +116,12 @@ export function validateWeekData(weekData) {
         throw new Error('Estado de integrante extra no válido');
     }
 
+    if (typeof extraData.dismissed === 'boolean') {
+        normalizedExtra.dismissed = extraData.dismissed;
+    } else if (extraData.dismissed !== undefined) {
+        throw new Error('Estado de descarte de integrante extra no válido');
+    }
+
     if (extraData.name !== undefined) {
         if (typeof extraData.name !== 'string') {
             throw new Error('Nombre de integrante extra no válido');

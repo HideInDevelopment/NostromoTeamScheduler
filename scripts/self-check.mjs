@@ -16,6 +16,7 @@ const validWeek = {
     },
     extra: {
         enabled: true,
+        dismissed: false,
         name: 'Refuerzo',
         days: { 2: 'mandatory' },
     },
@@ -59,6 +60,11 @@ assert.throws(
 );
 
 assert.throws(
+    () => validateWeekData({ extra: { dismissed: 'no' } }),
+    /Estado de descarte de integrante extra no válido/
+);
+
+assert.throws(
     () => validateWeekData({ extra: { name: 123 } }),
     /Nombre de integrante extra no válido/
 );
@@ -89,6 +95,7 @@ const seededWeek = createSeedWeekData();
 assert.deepEqual(Object.keys(seededWeek.team), TEAM);
 assert.deepEqual(seededWeek.team.Majo, {});
 assert.deepEqual(seededWeek.extra, createEmptyExtraWeekData());
+assert.equal(seededWeek.extra.dismissed, false);
 assert.equal(seededWeek.extra.name, EXTRA_DEFAULT_NAME);
 assert.equal(STATUS_OPTIONS.some(option => option.key === 'mandatory'), true);
 

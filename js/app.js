@@ -90,6 +90,14 @@ function isExtraEnabled(monday) {
     return getExtraWeekData(monday).enabled === true;
 }
 
+function createInheritedExtraWeekData(sourceExtra) {
+    return {
+        ...createEmptyExtraWeekData(),
+        enabled: true,
+        name: sourceExtra?.name?.trim() || EXTRA_DEFAULT_NAME,
+    };
+}
+
 function getStatus(monday, person, dayIdx) {
     if (person === EXTRA_ROW_ID) {
         return getExtraWeekData(monday).days?.[dayIdx] ?? null;
@@ -112,11 +120,10 @@ function setStatus(monday, person, dayIdx, statusKey) {
 }
 
 function setExtraEnabled(monday, enabled) {
-    const extra = getExtraWeekData(monday);
-    extra.enabled = enabled;
-    if (enabled && !extra.name) {
-        extra.name = EXTRA_DEFAULT_NAME;
-    }
+    const weekData = getWeekData(monday);
+    weekData.extra = enabled
+        ? createInheritedExtraWeekData(weekData.extra)
+        : { ...createEmptyExtraWeekData(), dismissed: true };
     markDirty();
 }
 
@@ -554,6 +561,18 @@ async function navigateTo(newMonday) {
             updateSaveButton();
         }
     }
+
+    const sourceExtra = getExtraWeekData(currentMonday);
+    const targetWeek = getWeekData(newMonday);
+    if (
+        sourceExtra.enabled &&
+        !targetWeek.extra?.enabled &&
+        targetWeek.extra?.dismissed !== true
+    ) {
+        targetWeek.extra = createInheritedExtraWeekData(sourceExtra);
+        markDirty();
+    }
+
     currentMonday = newMonday;
     render();
 }
